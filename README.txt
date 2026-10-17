@@ -6,4 +6,5 @@ Easiest way to use it on your phone:
 3. iPhone: Share > Add to Home Screen.  Android: menu > Install app.
 
 It works offline after the first load. Data is saved on your phone only.
+The Tally coach compares your local spending totals, budgets, and limits on your device. Coach answers work offline; no spending data is sent to an AI service.
 (Opening index.html directly from files works for a quick preview, but installing and offline mode need the hosted link.)
