@@ -200,7 +200,7 @@ function settings(){
  <div class="set"><span>Erase everything</span><button class="link red" data-wipe="1">Erase</button></div></div>
  <p class="empty" style="padding:20px">Your data stays on this phone.<br>Backups let you move it to another device.</p>`;
  $('#app').innerHTML=h}
-function render(){({home,stats,set:settings})[tab]()}
+function render(){const views={home,stats,set:settings,settings};(views[tab]||home)()}
 function openSheet(id){
  const t=id?S.tx.find(x=>x.id===id):null;
  sh={id:id||0,cat:t?t.cat:'food',card:t?t.card:(cf!=='all'?cf:S.cards[0].id)};
