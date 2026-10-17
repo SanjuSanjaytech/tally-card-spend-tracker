@@ -138,7 +138,8 @@ const CUR=['USD','EUR','GBP','JPY','INR','AUD','CAD','CNY','KRW','SGD','CHF','AE
 const def=()=>({tx:[],cards:[{id:'c1',name:'My card',color:COL[0]}],cur:'INR',currencyChosen:true,limit:0,budgets:{}});
 let S;try{S=JSON.parse(localStorage.getItem('tally'))||def()}catch(e){S=def()}
 if(!S.currencyChosen&&S.cur==='USD')S.cur='INR';S.currencyChosen=true;S.cur=CUR.includes(S.cur)?S.cur:'INR';S.budgets=S.budgets&&typeof S.budgets==='object'&&!Array.isArray(S.budgets)?S.budgets:{};S.cards=Array.isArray(S.cards)&&S.cards.length?S.cards:def().cards;S.tx=Array.isArray(S.tx)?S.tx:[];
-const save=()=>{try{localStorage.setItem('tally',JSON.stringify(S))}catch(e){}};
+const save=()=>{const raw=JSON.stringify(S);try{localStorage.setItem('tally',raw)}catch(e){}try{if(window.TallyWidget)window.TallyWidget.save(raw)}catch(e){}};
+function downloadFile(name,content,type){if(window.TallyWidget&&window.TallyWidget.saveFile){window.TallyWidget.saveFile(name,type,btoa(unescape(encodeURIComponent(content))));return}const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 const fmt=n=>{try{return new Intl.NumberFormat(S.cur==='INR'?'en-IN':undefined,{style:'currency',currency:S.cur}).format(n)}catch(e){return n.toFixed(2)}};
 const sym=()=>{try{return new Intl.NumberFormat(S.cur==='INR'?'en-IN':undefined,{style:'currency',currency:S.cur}).formatToParts(0).find(p=>p.type==='currency').value}catch(e){return S.cur==='INR'?'₹':'$'}};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -232,9 +233,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
  else if(d.ac){const n=prompt('Card name');if(n&&n.trim()){S.cards.push({id:'c'+Date.now(),name:n.trim().slice(0,20),color:COL[S.cards.length%COL.length]});save();render()}}
  else if(d.rn){const c=cardOf(d.rn),n=prompt('Rename card',c.name);if(n&&n.trim()){c.name=n.trim().slice(0,20);save();render()}}
  else if(d.dc){if(S.cards.length<2)return toast('Keep at least one card');if(confirm('Remove this card? Its spends stay in your history.')){S.cards=S.cards.filter(c=>c.id!==d.dc);if(cf===d.dc)cf='all';save();render()}}
-  else if(d.x){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const r=['Date,Amount,Currency,Category,Card,Note'].concat(S.tx.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(t=>[t.date,t.amt,S.cur,q((CATS[t.cat]||CATS.other)[1]),q(cardOf(t.card).name),q(t.note)].join(',')));
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='tally-'+today()+'.csv';a.click()}
-  else if(d.backup){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,backupVersion:1,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}));a.download='tally-backup-'+today()+'.json';a.click()}
+  else if(d.x){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const r=['Date,Amount,Currency,Category,Card,Note'].concat(S.tx.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(t=>[t.date,t.amt,S.cur,q((CATS[t.cat]||CATS.other)[1]),q(cardOf(t.card).name),q(t.note)].join(',')));downloadFile('tally-'+today()+'.csv',r.join('\n'),'text/csv')}
+  else if(d.backup)downloadFile('tally-backup-'+today()+'.json',JSON.stringify({...S,backupVersion:1,exportedAt:new Date().toISOString()},null,2),'application/json');
   else if(d.restore)$('#restore-file').click();
  else if(d.wipe){if(confirm('Erase all spends and settings? This cannot be undone.')){S=def();save();cf='all';render()}}});
  document.addEventListener('change',async e=>{

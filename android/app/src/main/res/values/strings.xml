@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Tally</string>
+    <string name="widget_description">See this month’s card spend at a glance</string>
+</resources>
