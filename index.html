@@ -100,6 +100,13 @@ nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;p
 .toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translate(-50%,30px);background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:99px;font-size:13px;opacity:0;transition:all .3s;z-index:20;display:flex;gap:14px;white-space:nowrap}
 .toast.on{opacity:1;transform:translate(-50%,0)}
 .toast button{color:#FFB547;font-weight:700}
+.budgetrow{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.budgetrow:last-child{border:0}
+.budgetrow small{color:var(--mut)}
+.budgetbar{grid-column:1/-1;height:7px;border-radius:8px;background:var(--bg);overflow:hidden}
+.budgetbar i{display:block;height:100%;border-radius:8px;background:var(--ok)}
+.budgetbar i.over{background:var(--warn)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style></head>
 <body>
@@ -128,8 +135,9 @@ const CATS={food:['🍜','Food'],groc:['🛒','Groceries'],ride:['🚆','Transpo
 const CC={food:'#F76707',groc:'#37B24D',ride:'#1C7ED6',shop:'#D6336C',bill:'#7048E8',fun:'#F59F00',health:'#0CA678',trip:'#15AABF',sub:'#AE3EC9',other:'#868E96'};
 const COL=['#5B4BDB','#E8590C','#0C8F6B','#C2255C','#1C7ED6','#9C36B5'];
 const CUR=['USD','EUR','GBP','JPY','INR','AUD','CAD','CNY','KRW','SGD','CHF','AED','BRL','MXN','IDR','PHP','THB'];
-const def=()=>({tx:[],cards:[{id:'c1',name:'My card',color:COL[0]}],cur:'INR',limit:0});
+const def=()=>({tx:[],cards:[{id:'c1',name:'My card',color:COL[0]}],cur:'INR',currencyChosen:true,limit:0,budgets:{}});
 let S;try{S=JSON.parse(localStorage.getItem('tally'))||def()}catch(e){S=def()}
+if(!S.currencyChosen&&S.cur==='USD')S.cur='INR';S.currencyChosen=true;S.cur=CUR.includes(S.cur)?S.cur:'INR';S.budgets=S.budgets&&typeof S.budgets==='object'&&!Array.isArray(S.budgets)?S.budgets:{};S.cards=Array.isArray(S.cards)&&S.cards.length?S.cards:def().cards;S.tx=Array.isArray(S.tx)?S.tx:[];
 const save=()=>{try{localStorage.setItem('tally',JSON.stringify(S))}catch(e){}};
 const fmt=n=>{try{return new Intl.NumberFormat(S.cur==='INR'?'en-IN':undefined,{style:'currency',currency:S.cur}).format(n)}catch(e){return n.toFixed(2)}};
 const sym=()=>{try{return new Intl.NumberFormat(S.cur==='INR'?'en-IN':undefined,{style:'currency',currency:S.cur}).formatToParts(0).find(p=>p.type==='currency').value}catch(e){return S.cur==='INR'?'₹':'$'}};
@@ -137,7 +145,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const pad=n=>String(n).padStart(2,'0');
 const ds=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const today=()=>ds(new Date());
-let tab='home',cf='all',now=new Date(),ym={y:now.getFullYear(),m:now.getMonth()},sh=null;
+let tab='home',cf='all',now=new Date(),ym={y:now.getFullYear(),m:now.getMonth()},sh=null,query='';
 const pre=()=>ym.y+'-'+pad(ym.m+1);
 const cardOf=id=>S.cards.find(c=>c.id===id)||{name:'Deleted card',color:'#868E96'};
 const inMonth=(p,all)=>S.tx.filter(t=>t.date.startsWith(p)&&(all||cf==='all'||t.card===cf));
@@ -153,9 +161,11 @@ function home(){
  <div class="big" id="big">${fmt(0)}</div>
  <div class="bar ${over?'over':''}"><i id="fill"></i></div>
  <div class="hint"><span>${lim>0?(over?fmt(all-lim)+' over your limit':fmt(lim-all)+' left this month'):'Set a monthly limit in Settings'}</span><span>${lim>0?Math.round(all/lim*100)+'%':''}</span></div></div>`+chipsHTML();
- if(!tx.length)h+=`<div class="empty"><big>💳</big>No spends this month.<br>Tap + after your next card payment.</div>`;
- let last='',i=0;
- tx.forEach(t=>{if(t.date!==last){last=t.date;const d=new Date(t.date+'T00:00'),dt=sum(tx.filter(x=>x.date===t.date));
+  h+=`<div class="fld"><label class="sr" for="tx-search">Search spends</label><input id="tx-search" type="search" placeholder="Search this month" value="${esc(query)}" autocomplete="off"></div>`;
+  const shown=tx.filter(t=>{const c=CATS[t.cat]||CATS.other;return !query||`${t.note||''} ${c[1]} ${cardOf(t.card).name}`.toLowerCase().includes(query.toLowerCase())});
+  if(!shown.length)h+=`<div class="empty"><big>${tx.length?'⌕':'💳'}</big>${tx.length?'No spends match your search.':'No spends this month.'}<br>${tx.length?'Try another merchant, card or category.':'Tap + after your next card payment.'}</div>`;
+  let last='',i=0;
+  shown.forEach(t=>{if(t.date!==last){last=t.date;const d=new Date(t.date+'T00:00'),dt=sum(shown.filter(x=>x.date===t.date));
   h+=`<div class="day"><span>${t.date===today()?'Today':d.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})}</span><span>${fmt(dt)}</span></div>`}
   const c=CATS[t.cat]||CATS.other,cd=cardOf(t.card);
   h+=`<button class="row" data-e="${t.id}" style="animation-delay:${Math.min(i++,10)*30}ms"><span class="ico" style="background:${CC[t.cat]||CC.other}22">${c[0]}</span><div><b>${esc(t.note||c[1])}</b><small><span class="dot" style="background:${cd.color};width:8px;height:8px;margin-right:5px"></span>${esc(cd.name)} · ${c[1]}</small></div><em>${fmt(t.amt)}</em></button>`});
@@ -167,7 +177,9 @@ function stats(){
  if(!tx.length){$('#app').innerHTML=h+`<div class="empty"><big>📊</big>Nothing to show yet.<br>Add a spend to see where your money goes.</div>`;return}
  const C=2*Math.PI*56;let off=0,seg='';
  list.forEach(([k,v])=>{const l=v/tot*C;seg+=`<circle cx="70" cy="70" r="56" stroke="${CC[k]||CC.other}" stroke-dasharray="${Math.max(l-2,0)} ${C-Math.max(l-2,0)}" stroke-dashoffset="${-off}"/>`;off+=l});
- const days=new Date(ym.y,ym.m+1,0).getDate(),isNow=ym.y===now.getFullYear()&&ym.m===now.getMonth(),elapsed=isNow?now.getDate():days,big=tx.reduce((a,b)=>b.amt>a.amt?b:a);
+  const days=new Date(ym.y,ym.m+1,0).getDate(),isNow=ym.y===now.getFullYear()&&ym.m===now.getMonth(),elapsed=isNow?now.getDate():days,big=tx.reduce((a,b)=>b.amt>a.amt?b:a);
+  const budgets=Object.entries(S.budgets||{}).filter(([k,v])=>v>0);
+  if(budgets.length)h+=`<h2>Budget progress</h2><div class="card">${budgets.map(([k,v])=>{const spent=by[k]||0,pct=Math.min(spent/v*100,100),c=CATS[k]||CATS.other;return `<div class="budgetrow"><span>${c[0]} ${c[1]} <small>${fmt(spent)} of ${fmt(v)}</small></span><b>${Math.round(spent/v*100)}%</b><div class="budgetbar"><i class="${spent>v?'over':''}" style="width:${pct}%"></i></div></div>`}).join('')}</div>`;
  h+=`<h2>By category</h2><div class="card donut"><svg viewBox="0 0 140 140">${seg}</svg><div class="leg">${list.slice(0,6).map(([k,v])=>`<span><i style="background:${CC[k]||CC.other}"></i>${(CATS[k]||CATS.other)[1]} · ${Math.round(v/tot*100)}%</span>`).join('')}</div></div>
  <div class="stats"><div>Daily average<b>${fmt(tot/elapsed)}</b></div><div>Spends<b>${tx.length}</b></div><div>Biggest<b>${fmt(big.amt)}</b></div></div>
  <h2>Last 6 months</h2><div class="card"><div class="trend">`;
@@ -180,11 +192,15 @@ function settings(){
  <div class="set"><span>Currency</span><select id="s-cur">${CUR.map(c=>`<option ${c===S.cur?'selected':''}>${c}</option>`).join('')}</select></div>
  <div class="set"><span>Monthly limit</span><input id="s-lim" inputmode="decimal" placeholder="No limit" value="${S.limit||''}"></div></div>
  <h2>Your cards</h2><div class="card">`+S.cards.map(c=>`<div class="set"><span><span class="dot" style="background:${c.color}"></span>${esc(c.name)}</span><span><button class="link" data-rn="${c.id}">Rename</button> <button class="link red" data-dc="${c.id}">Remove</button></span></div>`).join('')+`<button class="link" data-ac="1">+ Add a card</button></div>
+ <h2>Category budgets</h2><div class="card">${Object.entries(CATS).map(([k,v])=>`<div class="set"><span>${v[0]} ${v[1]}</span><input type="number" min="0" step="0.01" inputmode="decimal" data-budget="${k}" aria-label="${v[1]} monthly budget" placeholder="No limit" value="${S.budgets[k]||''}"></div>`).join('')}</div>
  <h2>Your data</h2><div class="card"><div class="set"><span>Export all spends (CSV)</span><button class="link" data-x="1">Export</button></div>
+ <div class="set"><span>Download full backup</span><button class="link" data-backup="1">Back up</button></div>
+ <div class="set"><span>Restore from backup</span><button class="link" data-restore="1">Restore</button></div>
+ <input class="sr" type="file" id="restore-file" accept="application/json,.json">
  <div class="set"><span>Erase everything</span><button class="link red" data-wipe="1">Erase</button></div></div>
- <p class="empty" style="padding:20px">Data stays on this phone only.<br>Export now and then as a backup.</p>`;
+ <p class="empty" style="padding:20px">Your data stays on this phone.<br>Backups let you move it to another device.</p>`;
  $('#app').innerHTML=h}
-function render(){({home,stats,settings})[tab]()}
+function render(){({home,stats,set:settings})[tab]()}
 function openSheet(id){
  const t=id?S.tx.find(x=>x.id===id):null;
  sh={id:id||0,cat:t?t.cat:'food',card:t?t.card:(cf!=='all'?cf:S.cards[0].id)};
@@ -216,11 +232,16 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
  else if(d.ac){const n=prompt('Card name');if(n&&n.trim()){S.cards.push({id:'c'+Date.now(),name:n.trim().slice(0,20),color:COL[S.cards.length%COL.length]});save();render()}}
  else if(d.rn){const c=cardOf(d.rn),n=prompt('Rename card',c.name);if(n&&n.trim()){c.name=n.trim().slice(0,20);save();render()}}
  else if(d.dc){if(S.cards.length<2)return toast('Keep at least one card');if(confirm('Remove this card? Its spends stay in your history.')){S.cards=S.cards.filter(c=>c.id!==d.dc);if(cf===d.dc)cf='all';save();render()}}
- else if(d.x){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const r=['Date,Amount,Category,Card,Note'].concat(S.tx.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(t=>[t.date,t.amt,(CATS[t.cat]||CATS.other)[1],q(cardOf(t.card).name),q(t.note)].join(',')));
+  else if(d.x){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const r=['Date,Amount,Currency,Category,Card,Note'].concat(S.tx.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(t=>[t.date,t.amt,S.cur,q((CATS[t.cat]||CATS.other)[1]),q(cardOf(t.card).name),q(t.note)].join(',')));
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='tally-'+today()+'.csv';a.click()}
+  else if(d.backup){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({...S,backupVersion:1,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'}));a.download='tally-backup-'+today()+'.json';a.click()}
+  else if(d.restore)$('#restore-file').click();
  else if(d.wipe){if(confirm('Erase all spends and settings? This cannot be undone.')){S=def();save();cf='all';render()}}});
-document.addEventListener('change',e=>{if(e.target.id==='s-cur'){S.cur=e.target.value;save()}});
-document.addEventListener('input',e=>{if(e.target.id==='s-lim'){S.limit=parseFloat(e.target.value.replace(',','.'))||0;save()}});
+ document.addEventListener('change',async e=>{
+  if(e.target.id==='s-cur'){S.cur=e.target.value;S.currencyChosen=true;save();render()}
+  if(e.target.id==='restore-file'&&e.target.files.length){try{const b=JSON.parse(await e.target.files[0].text());if(!Array.isArray(b.tx)||!Array.isArray(b.cards)||!b.cards.length)throw Error('invalid');const cards=b.cards.filter(c=>c&&c.id&&c.name).map(c=>({id:String(c.id),name:String(c.name).slice(0,40),color:/^#[0-9a-f]{6}$/i.test(c.color)?c.color:COL[0]}));if(!cards.length)throw Error('invalid');S={tx:b.tx.filter(t=>t&&Number.isFinite(+t.amt)&&+t.amt>0&&/^\d{4}-\d{2}-\d{2}$/.test(t.date)).map(t=>({id:t.id||Date.now()+Math.random(),amt:Math.round(+t.amt*100)/100,cat:CATS[t.cat]?t.cat:'other',card:cards.some(c=>c.id===String(t.card))?String(t.card):cards[0].id,note:String(t.note||'').slice(0,60),date:t.date})),cards,cur:CUR.includes(b.cur)?b.cur:'INR',currencyChosen:true,limit:Math.max(0,+b.limit||0),budgets:{}};for(const [k,v] of Object.entries(b.budgets||{}))if(CATS[k]&&Number.isFinite(+v)&&+v>0)S.budgets[k]=+v;save();cf='all';query='';render();toast('Backup restored')}catch(err){toast('That backup file is not valid')}e.target.value=''}
+ });
+ document.addEventListener('input',e=>{if(e.target.id==='s-lim'){S.limit=parseFloat(e.target.value.replace(',','.'))||0;save()}else if(e.target.dataset.budget){const v=parseFloat(e.target.value.replace(',','.'));if(v>0)S.budgets[e.target.dataset.budget]=v;else delete S.budgets[e.target.dataset.budget];save()}else if(e.target.id==='tx-search'){query=e.target.value;home();const n=$('#tx-search');n.focus();n.setSelectionRange(query.length,query.length)}});
 render();
 if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 </script></body></html>
