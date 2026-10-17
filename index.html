@@ -161,7 +161,8 @@ function home(){
  <div class="hero" style="--c1:${c1}"><small>${cf==='all'?'Spent on all cards':'Spent on '+esc(cardOf(cf).name)}</small>
  <div class="big" id="big">${fmt(0)}</div>
  <div class="bar ${over?'over':''}"><i id="fill"></i></div>
- <div class="hint"><span>${lim>0?(over?fmt(all-lim)+' over your limit':fmt(lim-all)+' left this month'):'Set a monthly limit in Settings'}</span><span>${lim>0?Math.round(all/lim*100)+'%':''}</span></div></div>`+chipsHTML();
+  <div class="hint"><span>${lim>0?'All cards · '+fmt(all)+' spent of '+fmt(lim):'Set a monthly limit in Settings'}</span><span>${lim>0?Math.round(all/lim*100)+'% used':''}</span></div>
+  ${lim>0?`<div class="hint"><span>${over?'Over your limit':'Available this month'}</span><b>${fmt(Math.abs(lim-all))}</b></div>`:''}</div>`+chipsHTML();
   h+=`<div class="fld"><label class="sr" for="tx-search">Search spends</label><input id="tx-search" type="search" placeholder="Search this month" value="${esc(query)}" autocomplete="off"></div>`;
   const shown=tx.filter(t=>{const c=CATS[t.cat]||CATS.other;return !query||`${t.note||''} ${c[1]} ${cardOf(t.card).name}`.toLowerCase().includes(query.toLowerCase())});
   if(!shown.length)h+=`<div class="empty"><big>${tx.length?'⌕':'💳'}</big>${tx.length?'No spends match your search.':'No spends this month.'}<br>${tx.length?'Try another merchant, card or category.':'Tap + after your next card payment.'}</div>`;
